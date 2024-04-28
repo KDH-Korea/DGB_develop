@@ -1,0 +1,13 @@
+/dgb_project
+    /static
+        /js
+            - script.js
+    /templates
+        - index.html
+    - app.py
+    - crawler.py
+    - preprocessing_and_learning.py
+    - clustering.py
+    - sna_analysis.py
+    - lda_analysis.py
+    - results_presentation.py
