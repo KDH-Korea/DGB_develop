@@ -94,20 +94,22 @@ if uploaded_file:
     df_merged.loc[unlabeled_indices, 'RNN_Label'] = RNN_pseudo_labels.flatten()
 
     # LSTM과 RNN의 예측 결과가 다를 경우, GRU를 사용하여 재분류
-    different_indices = [i for i, (lstm_label, rnn_label) in enumerate(zip(LSTM_pseudo_labels.flatten(), RNN_pseudo_labels.flatten())) if lstm_label != rnn_label]
-
-    if different_indices:
-        # GRU를 사용하여 예측
-        X_different = X_unlabeled[different_indices]
+    different_indices = df_merged[(df_merged['LSTM_Label'] != df_merged['RNN_Label']) & (unlabeled_indices)].index
+    if different_indices.any():
+        X_different = padded_sequences[different_indices]
         model_GRU = Sequential([
             Embedding(input_dim=len(tokenizer.word_index) + 1, output_dim=100, input_length=max_seq_length),
             GRU(128),
             Dense(1, activation='sigmoid')
         ])
-        GRU_pseudo_labels = train_and_predict_model(model_GRU, X_labeled, y_labeled, X_different)
-        df_merged.loc[unlabeled_indices[different_indices], 'GRU_Label'] = GRU_pseudo_labels.flatten()
+        model_GRU.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+        model_GRU.fit(X_labeled, y_labeled, epochs=10, batch_size=32, validation_split=0.2)
+        gru_pseudo_labels = (model_GRU.predict(X_different) > 0.5).astype(int)
+        df_merged.loc[different_indices, 'GRU_Label'] = gru_pseudo_labels.flatten()
+        df_merged['final_label'] = np.where(df_merged['LSTM_Label'] == df_merged['RNN_Label'], df_merged['LSTM_Label'], df_merged['GRU_Label'])
     else:
-        st.write("LSTM과 RNN 모델의 예측 결과가 모두 동일하여 GRU 모델을 사용하지 않습니다.")
+        df_merged['final_label'] = df_merged['LSTM_Label']
     
+    df_merged = df_merged[(df_merged['final_label'] != 0) & (df_merged['final_label'].notna())]
     st.write("레이블링된 데이터:", df_merged)
     st.download_button(label="CSV로 다운로드", data=df_merged.to_csv(index=False).encode('utf-8'), file_name='labeled_data.csv', mime='text/csv')

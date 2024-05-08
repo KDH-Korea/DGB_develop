@@ -1,0 +1,5 @@
+1. 데이터 불러오기 -> keyword, date, text, tok_text, label, LSTM_Label, RNN_Label, GRU_Label, final_label
+2. keyword, date, text, tok_text, final_label
+3. keyword, date, text, tok_text, final_label + vector
+4. keyword, date, text, tok_text, final_label + vector,  PC1, PC2
+5. 

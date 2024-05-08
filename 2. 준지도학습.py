@@ -14,7 +14,7 @@ from keras.layers import Embedding, SimpleRNN, Dense
 from keras.layers import GRU
 
 # 데이터 불러오기
-df = pd.read_csv(r'C:\Users\ehdgo\OneDrive - 계명대학교\대학\동아리\23~24년 2차 DGB 대회\본선 개발\형태소분석_20240429_124411.csv')
+df = pd.read_csv(r'C:\Users\ehdgo\OneDrive - 계명대학교\대학\동아리\23~24년 2차 DGB 대회\본선 개발\형태소분석_20240507_204434.csv')
 # 데이터 3% 추출
 labeling_df = pd.DataFrame(df['text'].sample(int(0.03 * len(df))))
 
@@ -130,21 +130,28 @@ df_merged.loc[unlabeled_indices, 'RNN_Label'] = RNN_pseudo_labels.flatten()
 # LSTM과 RNN의 예측 결과가 다른 데이터 선택
 different_indices = df_merged[(df_merged['LSTM_Label'] != df_merged['RNN_Label']) & (unlabeled_indices)].index
 X_different = padded_sequences[different_indices]
-# GRU 모델 설정
-model_GRU = Sequential([
-    Embedding(input_dim=len(tokenizer.word_index) + 1, output_dim=100, input_length=max_seq_length),
-    GRU(128),
-    Dense(1, activation='sigmoid')
-])
-model_GRU.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-# GRU 모델 훈련
-model_GRU.fit(X_labeled, y_labeled, epochs=10, batch_size=32, validation_split=0.2)
-# 의사 레이블 생성
-GRU_pseudo_labels = (model_GRU.predict(X_different) > 0.5).astype(int)
-# 준지도 학습
-X_combined = np.vstack((X_labeled, X_unlabeled))
-y_combined = np.concatenate((y_labeled, GRU_pseudo_labels.flatten()))
-model_GRU.fit(X_combined, y_combined, epochs=10, batch_size=32, validation_split=0.2)
-# 최종 예측 수행 및 데이터에 추가
-GRU_pseudo_labels = (model_RNN.predict(X_unlabeled) > 0.5).astype(int)
-df_merged.loc[different_indices, 'GRU_Label'] = GRU_pseudo_labels.flatten()
+# GRU 모델을 사용해야 하는지 확인
+if different_indices:
+    # GRU 모델을 사용해야 할 경우에만 진행
+    model_GRU = Sequential([
+        Embedding(input_dim=len(tokenizer.word_index) + 1, output_dim=100, input_length=max_seq_length),
+        GRU(128),
+        Dense(1, activation='sigmoid')
+    ])
+    model_GRU.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+    model_GRU.fit(X_labeled, y_labeled, epochs=10, batch_size=32, validation_split=0.2)
+    # GRU 모델을 사용한 예측
+    gru_pseudo_labels = (model_GRU.predict(X_different) > 0.5).astype(int)
+    df_merged.loc[unlabeled_indices[different_indices], 'GRU_Label'] = gru_pseudo_labels.flatten()
+    # final_label 생성 및 할당
+    df_merged['final_label'] = np.where(df_merged['LSTM_Label'] == df_merged['RNN_Label'], df_merged['LSTM_Label'], df_merged['GRU_Label'])
+else:
+    # GRU 예측이 없는 경우에 대한 처리를 여기서 수행합니다
+    df_merged['final_label'] = df_merged['LSTM_Label']
+# final_label 값이 0인 데이터 삭제
+df_merged = df_merged[(df_merged['final_label'] != 0) & (df_merged['final_label'].notna())]
+# 결과 확인
+print(df_merged)
+
+
+    
